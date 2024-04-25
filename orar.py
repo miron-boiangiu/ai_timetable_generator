@@ -13,6 +13,7 @@ from utils import *
 PROF_INTERVALS_NO = "_PROF_INTERVALS_NO"
 STUDENTS_TO_ASSIGN_PER_SUBJECT = "_STUDENTS_LEFT_TO_ASSIGN"
 ENTRIES_NO = "_ENTRIES_NO"
+WEAK_CONSTRAINTS = "_WEAK_CONSTRAINTS"
 
 def all_covered(state, timetable_specs):
     # Considering the state is valid, are all subjects covered?
@@ -30,20 +31,37 @@ def count_weak_constraints(state, timetable_specs):
     return count
 
 
-def pick_subject(state, timetable_specs):
-    least_students_remaining = ("", float('inf'))
+def pick_subject(state, timetable_specs): # Can prof score and class score beforehard or the whole order altogether if students are irrelevant
+    subject_to_prof_score = {}
+    subject_to_class_score = {}
 
-    for subject, students in state[STUDENTS_TO_ASSIGN_PER_SUBJECT].items():
-        if students <= 0:
-            continue
+    for subject in timetable_specs[MATERII]:
+        subject_to_prof_score[subject] = 0
+        subject_to_class_score[subject] = 0
+    
+    for sala, sala_specs in timetable_specs[SALI].items():
+        for materie in sala_specs[MATERII]:
+            subject_to_class_score[materie] += 1 / len(sala_specs[MATERII])
 
-        if students < least_students_remaining[1]:
-            least_students_remaining = (subject, students)
+    for prof, prof_specs in timetable_specs[PROFESORI].items():
+        for materie in prof_specs[MATERII]:
+            subject_to_prof_score[materie] += 1 / len(timetable_specs[PROFESORI])
 
-    return least_students_remaining[0]
+    subject_chosen = (None, float('inf'))
+
+    for subject in timetable_specs[MATERII]:
+        subject_to_prof_score[subject] /= len(timetable_specs[SALI])
+        subject_to_class_score[subject] /= len(timetable_specs[PROFESORI])
+
+        score = 0.5 * subject_to_prof_score[subject] + subject_to_class_score[subject]
+
+        if score < subject_chosen[1] and state[STUDENTS_TO_ASSIGN_PER_SUBJECT][subject] > 0:
+            subject_chosen = (subject, score)
+
+    return subject_chosen[0]
 
 
-def state_neighbours(state, timetable_specs):
+def state_neighbours(state, timetable_specs, subject_order):
 
     unfinished_subject = pick_subject(state, timetable_specs)
     valid_profs = [prof for prof in timetable_specs[PROFESORI].keys() if unfinished_subject in timetable_specs[PROFESORI][prof][MATERII]]
@@ -113,12 +131,44 @@ def generate_initial_timetable(timetable_specs):
     return timetable
 
 
+def generate_subject_order(timetable_specs):
+    subject_to_prof_score = {}
+    subject_to_class_score = {}
+    final_scores = []
+
+    for subject in timetable_specs[MATERII]:
+        subject_to_prof_score[subject] = 0
+        subject_to_class_score[subject] = 0
+    
+    for sala, sala_specs in timetable_specs[SALI].items():
+        for materie in sala_specs[MATERII]:
+            subject_to_class_score[materie] += 1 / len(sala_specs[MATERII])
+
+    for prof, prof_specs in timetable_specs[PROFESORI].items():
+        for materie in prof_specs[MATERII]:
+            subject_to_prof_score[materie] += 1 / len(timetable_specs[PROFESORI])
+
+    for pos, subject in enumerate(timetable_specs[MATERII].keys()):
+        subject_to_prof_score[subject] /= len(timetable_specs[SALI])
+        subject_to_class_score[subject] /= len(timetable_specs[PROFESORI])
+
+        score = 0.5 * subject_to_prof_score[subject] + subject_to_class_score[subject]
+
+        final_scores.append((score, pos, subject))
+
+    final_scores.sort()
+
+    return list(map(lambda t: t[2], final_scores))
+
+
 def astar(timetable_specs, max_iters = -1):
 
     min_classroom_size = float('inf')
     for classroom in timetable_specs[SALI]:
         if timetable_specs[SALI][classroom][CAPACITATE] < min_classroom_size:
             min_classroom_size = timetable_specs[SALI][classroom][CAPACITATE]
+
+    subject_order = generate_subject_order(timetable_specs)
 
     start = generate_initial_timetable(timetable_specs)
     frontier = []
@@ -141,7 +191,7 @@ def astar(timetable_specs, max_iters = -1):
 
         print("Looking at a node with", node[ENTRIES_NO], "entries")
 
-        for n in state_neighbours(node, timetable_specs):
+        for n in state_neighbours(node, timetable_specs, subject_order):
             state_key = str(n)
 
             if state_key not in discovered:
@@ -174,15 +224,15 @@ def prepare_output(result, timetable_specs):
 
 def run_a_star(input_file_name, timetable_specs, input_path):
     print("Running a*.")
-    result = astar(timetable_specs, 200)
+    result = astar(timetable_specs)
     # print(result)
     print(result[STUDENTS_TO_ASSIGN_PER_SUBJECT])
 
     result = prepare_output(result, timetable_specs)
     print(pretty_print_timetable(result, input_path))
 
-    # print("Constrangeri soft:", check_optional_constraints(proper_format, timetable_specs))
-    # print("Constrangeri hard:", check_mandatory_constraints(result, timetable_specs))
+    print("Constrangeri soft:", check_optional_constraints(result, timetable_specs))
+    print("Constrangeri hard:", check_mandatory_constraints(result, timetable_specs))
 
 if __name__ == "__main__":
 
