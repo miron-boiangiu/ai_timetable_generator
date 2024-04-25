@@ -37,6 +37,29 @@ def pick_subject(state, subject_order):
     return possible_subjects[0]
 
 
+def deepcopy_timetable(timetable, timetable_specs):
+    new_timetable = {}
+
+    new_timetable[ENTRIES_NO] = timetable[ENTRIES_NO]
+    
+    new_timetable[STUDENTS_TO_ASSIGN_PER_SUBJECT] = {}
+    for subject, no_stud in timetable[STUDENTS_TO_ASSIGN_PER_SUBJECT].items():
+        new_timetable[STUDENTS_TO_ASSIGN_PER_SUBJECT][subject] = no_stud
+
+    new_timetable[PROF_INTERVALS_NO] = {}
+    for prof, int_no in timetable[PROF_INTERVALS_NO].items():
+        new_timetable[PROF_INTERVALS_NO][prof] = int_no
+
+    for day in timetable_specs[ZILE]:
+        new_timetable[day] = {}
+        for interval in timetable[day]:
+            new_timetable[day][interval] = {}
+            for sala, tup in timetable[day][interval].items():
+                new_timetable[day][interval][sala] = tup
+
+    return new_timetable 
+
+
 def state_neighbours(state, timetable_specs, subject_order):
 
     unfinished_subject = pick_subject(state, subject_order)
@@ -58,7 +81,7 @@ def state_neighbours(state, timetable_specs, subject_order):
                     continue
 
                 for prof in available_profs:
-                    new_state = copy.deepcopy(state)
+                    new_state = deepcopy_timetable(state, timetable_specs)
                     new_state[ENTRIES_NO] += 1
                     new_state[day][interval][classroom] = (prof, unfinished_subject)
                     new_state[STUDENTS_TO_ASSIGN_PER_SUBJECT][unfinished_subject] -= timetable_specs[SALI][classroom][CAPACITATE]
