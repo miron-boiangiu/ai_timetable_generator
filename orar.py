@@ -31,39 +31,15 @@ def count_weak_constraints(state, timetable_specs):
     return count
 
 
-def pick_subject(state, timetable_specs): # Can prof score and class score beforehard or the whole order altogether if students are irrelevant
-    subject_to_prof_score = {}
-    subject_to_class_score = {}
+def pick_subject(state, subject_order):
 
-    for subject in timetable_specs[MATERII]:
-        subject_to_prof_score[subject] = 0
-        subject_to_class_score[subject] = 0
-    
-    for sala, sala_specs in timetable_specs[SALI].items():
-        for materie in sala_specs[MATERII]:
-            subject_to_class_score[materie] += 1 / len(sala_specs[MATERII])
-
-    for prof, prof_specs in timetable_specs[PROFESORI].items():
-        for materie in prof_specs[MATERII]:
-            subject_to_prof_score[materie] += 1 / len(timetable_specs[PROFESORI])
-
-    subject_chosen = (None, float('inf'))
-
-    for subject in timetable_specs[MATERII]:
-        subject_to_prof_score[subject] /= len(timetable_specs[SALI])
-        subject_to_class_score[subject] /= len(timetable_specs[PROFESORI])
-
-        score = 0.5 * subject_to_prof_score[subject] + subject_to_class_score[subject]
-
-        if score < subject_chosen[1] and state[STUDENTS_TO_ASSIGN_PER_SUBJECT][subject] > 0:
-            subject_chosen = (subject, score)
-
-    return subject_chosen[0]
+    possible_subjects = [subject for subject in subject_order if state[STUDENTS_TO_ASSIGN_PER_SUBJECT][subject] > 0]
+    return possible_subjects[0]
 
 
 def state_neighbours(state, timetable_specs, subject_order):
 
-    unfinished_subject = pick_subject(state, timetable_specs)
+    unfinished_subject = pick_subject(state, subject_order)
     valid_profs = [prof for prof in timetable_specs[PROFESORI].keys() if unfinished_subject in timetable_specs[PROFESORI][prof][MATERII]]
     valid_profs = list(filter(lambda prof: state[PROF_INTERVALS_NO][prof] > 0, valid_profs))
     valid_classrooms = [classroom for classroom in timetable_specs[SALI].keys() if unfinished_subject in timetable_specs[SALI][classroom][MATERII]]
