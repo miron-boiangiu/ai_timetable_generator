@@ -103,19 +103,22 @@ def state_neighbours(state, timetable_specs, subject_order):
                     new_states.append(new_state)
 
 
-    print("Computed", len(new_states), "neighbours")
-    random.shuffle(new_states)
+    # print("Computed", len(new_states), "neighbours")
+    # random.shuffle(new_states)
+
+    new_states.sort(key=lambda a: a[WEAK_CONSTRAINTS], reverse=True)
     return new_states
 
 
 def h(state, timetable_specs, min_classroom_size):
+    min_classroom_size -= 10
     unfinished_subjects = [tup for tup in state[STUDENTS_TO_ASSIGN_PER_SUBJECT].items() if tup[1] > 0]
 
     if len(unfinished_subjects) == 0:
         return 0
 
     leftover_students = sum(map(lambda a: a[1], unfinished_subjects))
-    return (leftover_students / min_classroom_size) + min(0.25 * state[WEAK_CONSTRAINTS], 2)
+    return (leftover_students / min_classroom_size) + 2 * state[WEAK_CONSTRAINTS]
 
 
 def g(state):
@@ -167,7 +170,7 @@ def generate_subject_order(timetable_specs):
         subject_to_prof_score[subject] /= len(timetable_specs[SALI])
         subject_to_class_score[subject] /= len(timetable_specs[PROFESORI])
 
-        score = 0.5 * subject_to_prof_score[subject] + subject_to_class_score[subject]
+        score = subject_to_class_score[subject] + 0.25 * subject_to_prof_score[subject]
 
         final_scores.append((score, pos, subject))
 
@@ -204,7 +207,7 @@ def astar(timetable_specs, max_iters = -1):
         if all_covered(node, timetable_specs):
             return node
 
-        print("Looking at a node with", node[ENTRIES_NO], "entries")
+        # print("Looking at a node with", node[ENTRIES_NO], "entries")
 
         for n in state_neighbours(node, timetable_specs, subject_order):
             state_key = str(n)
@@ -214,7 +217,7 @@ def astar(timetable_specs, max_iters = -1):
                 heappush(frontier, (g(n) + h(n, timetable_specs, min_classroom_size), heap_entries_count_priority, n) )
                 discovered[state_key] = g(n)
 
-        print("Heap now has", len(frontier), "elements")
+        # print("Heap now has", len(frontier), "elements")
         # frontier = frontier[:10000]
 
     return None
