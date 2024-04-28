@@ -9,11 +9,13 @@ from heapq import heappop, heappush
 from check_constraints import *
 from utils import *
 
+
 # State macros
 PROF_INTERVALS_NO = "_PROF_INTERVALS_NO"
 STUDENTS_TO_ASSIGN_PER_SUBJECT = "_STUDENTS_LEFT_TO_ASSIGN"
 ENTRIES_NO = "_ENTRIES_NO"
 WEAK_CONSTRAINTS = "_WEAK_CONSTRAINTS"
+
 
 def all_covered(state, timetable_specs):
     # Considering the state is valid, are all subjects covered?
@@ -25,12 +27,6 @@ def all_covered(state, timetable_specs):
     return True
 
 
-def count_weak_constraints(state, timetable_specs):
-    count = 0
-
-    return count
-
-
 def pick_subject(state, subject_order):
 
     possible_subjects = [subject for subject in subject_order if state[STUDENTS_TO_ASSIGN_PER_SUBJECT][subject] > 0]
@@ -40,6 +36,7 @@ def pick_subject(state, subject_order):
 def deepcopy_timetable(timetable, timetable_specs):
     new_timetable = {}
 
+    new_timetable[WEAK_CONSTRAINTS] = timetable[WEAK_CONSTRAINTS]
     new_timetable[ENTRIES_NO] = timetable[ENTRIES_NO]
     
     new_timetable[STUDENTS_TO_ASSIGN_PER_SUBJECT] = {}
@@ -71,6 +68,7 @@ def state_neighbours(state, timetable_specs, subject_order):
 
     for day in timetable_specs[ZILE]:
         for interval in state[day]:
+            interval_str = str(interval)
 
             profs_in_interval = [tup[0] for sala, tup in state[day][interval].items()]
             available_profs = [prof for prof in valid_profs if prof not in profs_in_interval]
@@ -86,7 +84,24 @@ def state_neighbours(state, timetable_specs, subject_order):
                     new_state[day][interval][classroom] = (prof, unfinished_subject)
                     new_state[STUDENTS_TO_ASSIGN_PER_SUBJECT][unfinished_subject] -= timetable_specs[SALI][classroom][CAPACITATE]
                     new_state[PROF_INTERVALS_NO][prof] -= 1
+
+                    for constrangere in timetable_specs[PROFESORI][prof][CONSTRANGERI]:
+                        if constrangere[0] != "!":
+                            continue
+
+                        if constrangere[1:] == day:
+                            new_state[WEAK_CONSTRAINTS] += 1
+                            continue
+
+
+                        if "-" in constrangere:
+                            parsed_interval = parse_interval(constrangere[1:])
+
+                            if parsed_interval[0] <= interval[0] and interval[1] <= parsed_interval[1]:
+                                new_state[WEAK_CONSTRAINTS] += 1
+
                     new_states.append(new_state)
+
 
     print("Computed", len(new_states), "neighbours")
     random.shuffle(new_states)
@@ -100,7 +115,7 @@ def h(state, timetable_specs, min_classroom_size):
         return 0
 
     leftover_students = sum(map(lambda a: a[1], unfinished_subjects))
-    return leftover_students / min_classroom_size
+    return (leftover_students / min_classroom_size) + min(0.25 * state[WEAK_CONSTRAINTS], 2)
 
 
 def g(state):
@@ -117,6 +132,7 @@ def generate_initial_timetable(timetable_specs):
             interval = literal_eval(interval)
             timetable[day][interval] = {}
 
+    timetable[WEAK_CONSTRAINTS] = 0
     timetable[ENTRIES_NO] = 0
 
     timetable[STUDENTS_TO_ASSIGN_PER_SUBJECT] = {}
@@ -126,7 +142,7 @@ def generate_initial_timetable(timetable_specs):
     timetable[PROF_INTERVALS_NO] = {}
     for prof in timetable_specs[PROFESORI]:
         timetable[PROF_INTERVALS_NO][prof] = 7
-
+    
     return timetable
 
 
@@ -199,7 +215,7 @@ def astar(timetable_specs, max_iters = -1):
                 discovered[state_key] = g(n)
 
         print("Heap now has", len(frontier), "elements")
-        # frontier = frontier[:500]
+        # frontier = frontier[:10000]
 
     return None
 
@@ -208,6 +224,7 @@ def prepare_output(result, timetable_specs):
     del result[ENTRIES_NO]
     del result[PROF_INTERVALS_NO]
     del result[STUDENTS_TO_ASSIGN_PER_SUBJECT]
+    del result[WEAK_CONSTRAINTS]
 
     for day in timetable_specs[ZILE]:
         for interval in timetable_specs[INTERVALE]:
@@ -225,8 +242,8 @@ def run_a_star(input_file_name, timetable_specs, input_path):
     print("Running a*.")
     result = astar(timetable_specs)
     # print(result)
-    print(result[STUDENTS_TO_ASSIGN_PER_SUBJECT])
 
+    print(result[WEAK_CONSTRAINTS])
     result = prepare_output(result, timetable_specs)
     print(pretty_print_timetable(result, input_path))
 
