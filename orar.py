@@ -95,7 +95,6 @@ def state_neighbours(state, timetable_specs, subject_order):
                             new_state[WEAK_CONSTRAINTS] += 1
                             continue
 
-
                         if "-" in constrangere:
                             parsed_interval = parse_interval(constrangere[1:])
 
@@ -281,27 +280,16 @@ def pcsp_aux(vars, domains, soft_constraints, hard_constraints, solution, cost, 
 
         evaluable_hard_constraints = fixed_constraints(new_solution, hard_constraints)
         evaluable_hard_constraints = list(filter(lambda a: var in a[0], evaluable_hard_constraints))
-        evaluable_constraints = fixed_constraints(new_solution, soft_constraints)
 
         hard_cost = len(list(filter(lambda a: not check_constraint(new_solution, a), evaluable_hard_constraints)))
 
         if hard_cost == 0:
             new_cost = cost
             if val != None:
-                for constrangere in timetable_specs[PROFESORI][val[0]][CONSTRANGERI]:
-                    if constrangere[0] != "!":
-                        continue
-
-                    if constrangere[1:] == var[0]:
-                        new_cost += 1
-                        continue
-
-
-                    if "-" in constrangere:
-                        parsed_interval = parse_interval(constrangere[1:])
-
-                        if parsed_interval[0] <= var[1][0] and var[1][1] <= parsed_interval[1]:
-                            new_cost += 1
+                # Add new soft constraints to cost
+                evaluable_constraints = fixed_constraints(new_solution, soft_constraints)
+                evaluable_constraints = list(filter(lambda a: var in a[0], evaluable_constraints))
+                new_cost += len(list(filter(lambda a: not check_constraint(new_solution, a), evaluable_constraints)))
 
             if new_cost < best_cost:
                 new_domains = copy.deepcopy(domains)
@@ -315,7 +303,6 @@ def pcsp_aux(vars, domains, soft_constraints, hard_constraints, solution, cost, 
                     sala = var[2]
 
                     new_subjects[materie] -= timetable_specs[SALI][sala][CAPACITATE]
-
 
                     # Remove this prof from the same interval
                     for entry in new_domains.keys():
@@ -421,10 +408,35 @@ def compute_hard_constraints(variables, timetable_specs):
 def compute_soft_constraints(variables, timetable_specs):  # I'm atomically close to off-ing myself. Unironically.
     soft_constraints = []
 
-    
+    for prof in timetable_specs[PROFESORI]:
+        prof_copy = copy.deepcopy(prof)
+        for constrangere in timetable_specs[PROFESORI][prof][CONSTRANGERI]:
+            if constrangere[0] != "!":
+                continue
 
+            if "-" in constrangere:
+                parsed_interval = parse_interval(constrangere[1:])
 
-    return []
+                for left_interval_margin in range(parsed_interval[0], parsed_interval[1], 2):
+                    for day in timetable_specs[ZILE]:
+                        for sala in timetable_specs[SALI]:
+                            variable = (day, (left_interval_margin, left_interval_margin+2), sala)
+                            soft_constraints.append(([variable], lambda a, prof_val = prof_copy: a[0] != prof_val))
+
+                continue
+            elif "Pauza" in constrangere:
+                continue
+            else:
+                day = constrangere[1:]
+
+                for interval in timetable_specs[INTERVALE]:
+                    interval = literal_eval(interval)
+                    for sala in timetable_specs[SALI]:
+                        variable = (day, interval, sala)
+                        soft_constraints.append(([variable], lambda a, prof_val = prof_copy: a[0] != prof_val))
+                continue
+
+    return soft_constraints
 
 
 def prepare_output_pcsp(result, timetable_specs):
