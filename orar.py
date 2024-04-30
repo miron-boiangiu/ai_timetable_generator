@@ -253,40 +253,37 @@ def fixed_constraints(solution, constraints):
     return fixed
 
 
-def pcsp_aux(vars, domains, soft_constraints, hard_constraints, acceptable_cost, solution, cost, unfinished_subjects, timetable_specs):
+def pcsp_aux(vars, domains, soft_constraints, hard_constraints, acceptable_cost, solution, cost, unfinished_subjects, prof_intervals, timetable_specs):
     global best_solution
     global best_cost
     global iterations
 
-    print("==========================================")
-    print("Enter")
-
-    print(solution)
-    print("=========")
-    print(unfinished_subjects)
+    # print(solution)
+    # print("=========")
+    # print(unfinished_subjects)
 
     if not unfinished_subjects:
         # Dacă nu mai sunt materii, am ajuns la o soluție mai bună
-        print("New best: " + str(cost) + " - " + str(solution))
+        print("New best: " + str(cost))
         best_solution = copy.deepcopy(solution)
         best_cost = cost
-        exit(0)
+
         return True
 
     elif not vars:
-        print("Tried all vars")
+        #print("d")
         return False
-    elif not domains[vars[0]]:  # TODO: Not all domains need to be filled, this should not be an end case
-        print("No more vals for var")
+    elif not domains[vars[0]]: 
+        #print("c")
         # pcsp_aux(vars, domains, soft_constraints, hard_constraints, acceptable_cost, solution, cost, unfinished_subjects, timetable_specs)
         return False
     elif cost >= best_cost:
+        #print("Cost too big")
         # Dacă am ajuns deja la un cost identic cu cel al celei mai bune soluții, nu mergem mai departe
-        print("Cost is too big")
         return False
     else:
+        #print("a")
         # Luăm prima variabilă și prima valoare din domeniu
-        print("Trying new val for var")
         var = vars[0]
         val = domains[var].pop(0)
         iterations += 1
@@ -323,6 +320,7 @@ def pcsp_aux(vars, domains, soft_constraints, hard_constraints, acceptable_cost,
             if new_cost < best_cost: # and new_cost <= acceptable_cost:
                 new_domains = copy.deepcopy(domains)
                 new_subjects = copy.deepcopy(unfinished_subjects)
+                new_prof_intervals = copy.deepcopy(prof_intervals)
 
                 # Decrease students for the chosen subject
                 if val != None:  # TODO: Also remove teachers in same time interval from domains
@@ -332,8 +330,20 @@ def pcsp_aux(vars, domains, soft_constraints, hard_constraints, acceptable_cost,
 
                     new_subjects[materie] -= timetable_specs[SALI][sala][CAPACITATE]
 
+
+                    # Remove this prof from the same interval
+                    for entry in new_domains.keys():
+                        if entry[0] == var[0] and entry[1] == var[1]:
+                            new_domains[entry] = list(filter(lambda a: a == None or a[0] != prof_name, new_domains[entry]))
+
+                    new_prof_intervals[prof_name] -= 1
+
+                    if new_prof_intervals[prof_name] == 0:
+                        # Remove this professor from all domains
+                        for entry in new_domains.keys():
+                            new_domains[entry] = list(filter(lambda a: a == None or a[0] != prof_name, new_domains[entry]))
+
                     if new_subjects[materie] <= 0:
-                        print("Finished subject")
                         # Remove it from all domains, since it is not required anymore
                         del new_subjects[materie]
 
@@ -345,10 +355,6 @@ def pcsp_aux(vars, domains, soft_constraints, hard_constraints, acceptable_cost,
                         filtered_domains = {}
                         for entry, entry_val in new_domains.items():
                             filtered_domains[entry] = list(filter(lambda a: a == None or a[1] != materie, entry_val))
-
-                        for entry in filtered_domains.keys():
-                            if entry[0] == var[0] and entry[1] == var[1]:
-                                filtered_domains[entry] = list(filter(lambda a: a == None or a[0] != prof_name, filtered_domains[entry]))
                         
                         new_domains = filtered_domains
 
@@ -356,16 +362,16 @@ def pcsp_aux(vars, domains, soft_constraints, hard_constraints, acceptable_cost,
                         #exit(0)
 
                 new_vars = vars[1:]
-                random.shuffle(new_vars)
-                found_solution = pcsp_aux(new_vars, new_domains, soft_constraints, hard_constraints, acceptable_cost, new_solution, new_cost, new_subjects, timetable_specs)
+                found_solution = pcsp_aux(new_vars, new_domains, soft_constraints, hard_constraints, acceptable_cost, new_solution, new_cost, new_subjects, new_prof_intervals, timetable_specs)
 
-                if found_solution:
-                    return True
-        else:
-            print("Does not meet hard constraints")
+                #if found_solution:
+                    #print("f")
+                    #return True
+        #else:
+            #print("too many hards")
 
-        print("Val was not good")
-        pcsp_aux(vars, domains, soft_constraints, hard_constraints, acceptable_cost, solution, cost, unfinished_subjects, timetable_specs)
+        #print("b")
+        pcsp_aux(vars, domains, soft_constraints, hard_constraints, acceptable_cost, solution, cost, unfinished_subjects, prof_intervals, timetable_specs)
         
         
 # Un wrapper care să instanțieze variabilele globale
@@ -376,8 +382,6 @@ def pcsp(problem, acceptable_cost, timetable_specs):
 
     [vars, domains, soft_constraints, hard_constraints] = [problem[e] for e in ["Vars", "Domains", "Soft_constraints", "Hard_constraints"]]
 
-    print(domains)
-
     best_solution = None
     best_cost = float('inf')
     iterations = 0
@@ -386,12 +390,12 @@ def pcsp(problem, acceptable_cost, timetable_specs):
     for subject, students_needed in timetable_specs[MATERII].items():
         students_needed_dict[subject] = students_needed
 
-    random.shuffle(vars)
+    prof_intervals = {}
+    for prof in timetable_specs[PROFESORI]:
+        prof_intervals[prof] = 7
 
-    pcsp_aux(vars, copy.deepcopy(domains), soft_constraints, hard_constraints, acceptable_cost, {}, 0, copy.deepcopy(students_needed_dict), timetable_specs)
+    pcsp_aux(vars, copy.deepcopy(domains), soft_constraints, hard_constraints, acceptable_cost, {}, 0, copy.deepcopy(students_needed_dict), prof_intervals, timetable_specs)
 
-    print("a")
-    print(best_solution)
     return best_solution
 
 
@@ -401,6 +405,8 @@ def compute_vars(timetable_specs):  # [(zi, interval, sala)]
         for interval in timetable_specs[INTERVALE]:
             for sala in timetable_specs[SALI]:
                 variables.append((zi, literal_eval(interval), sala))
+
+    variables.sort(key=lambda a: timetable_specs[SALI][a[2]][CAPACITATE], reverse=True)
 
     return variables
 
@@ -458,7 +464,9 @@ def prepare_output_pcsp(result, timetable_specs):
             interval = literal_eval(interval)
             timetable[day][interval] = {}
 
-    print(result)
+            for classroom in timetable_specs[SALI]:
+                timetable[day][interval][classroom] = None
+
     for when, who in result.items():
         timetable[when[0]][when[1]][when[2]] = who
 
@@ -482,7 +490,7 @@ def run_pcsp(input_file_name, timetable_specs, input_path):
     problem["Hard_constraints"] = hard_constraints
     problem["Soft_constraints"] = soft_constraints
 
-    result = pcsp(problem, 10, timetable_specs)
+    result = pcsp(problem, 2, timetable_specs)
     #print(result)
 
     #print(result[WEAK_CONSTRAINTS])
