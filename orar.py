@@ -345,32 +345,6 @@ def pcsp_aux(vars, domains, soft_constraints, hard_constraints, solution, cost, 
         pcsp_aux(vars, domains, soft_constraints, hard_constraints, solution, cost, unfinished_subjects, prof_intervals, timetable_specs)
 
 
-def pcsp(problem, timetable_specs):
-    global best_solution
-    global best_cost
-    global iterations
-    global best_iterations
-
-    [vars, domains, soft_constraints, hard_constraints] = [problem[e] for e in ["Vars", "Domains", "Soft_constraints", "Hard_constraints"]]
-
-    best_iterations = 0
-    best_solution = None
-    best_cost = float('inf')
-    iterations = 0
-
-    students_needed_dict = {}
-    for subject, students_needed in timetable_specs[MATERII].items():
-        students_needed_dict[subject] = students_needed
-
-    prof_intervals = {}
-    for prof in timetable_specs[PROFESORI]:
-        prof_intervals[prof] = 7
-
-    pcsp_aux(vars, copy.deepcopy(domains), soft_constraints, hard_constraints, {}, 0, copy.deepcopy(students_needed_dict), prof_intervals, timetable_specs)
-
-    return best_solution
-
-
 def compute_vars(timetable_specs):  # [(zi, interval, sala)]
     variables = []
     for zi in timetable_specs[ZILE]:
@@ -420,6 +394,7 @@ def compute_domains(variables, timetable_specs):
 
     return domains
 
+
 def no_same_prof_in_same_interval_constraint(a, b):
     if a == None or b == None:
         return True
@@ -463,8 +438,27 @@ def prepare_output_pcsp(result, timetable_specs):
     return timetable
 
 
-def run_pcsp(input_file_name, timetable_specs, input_path):
+def run_pcsp(input_path, timetable_specs):
+    global best_solution
+    global best_cost
+    global iterations
+    global best_iterations
+
     print("Running pcsp.")
+
+    best_iterations = 0
+    best_solution = None
+    best_cost = float('inf')
+    iterations = 0
+
+    students_needed_dict = {}
+    for subject, students_needed in timetable_specs[MATERII].items():
+        students_needed_dict[subject] = students_needed
+
+    prof_intervals = {}
+    for prof in timetable_specs[PROFESORI]:
+        prof_intervals[prof] = 7
+
     variables = compute_vars(timetable_specs)
 
     domains = compute_domains(variables, timetable_specs)
@@ -472,16 +466,12 @@ def run_pcsp(input_file_name, timetable_specs, input_path):
     hard_constraints = compute_hard_constraints(variables, timetable_specs)
     soft_constraints = compute_soft_constraints(variables, timetable_specs)
 
-    problem = {}
-    problem["Vars"] = variables
-    problem["Domains"] = domains
-    problem["Hard_constraints"] = hard_constraints
-    problem["Soft_constraints"] = soft_constraints
+    pcsp_aux(variables, copy.deepcopy(domains), soft_constraints, hard_constraints, {}, 0, copy.deepcopy(students_needed_dict), prof_intervals, timetable_specs)
 
-    result = pcsp(problem, timetable_specs)
+    result = best_solution
 
     if result == None:
-        print("No sol found")
+        print("No solution found")
         return
     
     result = prepare_output_pcsp(result, timetable_specs)
@@ -491,7 +481,7 @@ def run_pcsp(input_file_name, timetable_specs, input_path):
     print("Constrangeri hard:", check_mandatory_constraints(result, timetable_specs))
 
 
-def run_a_star(input_file_name, timetable_specs, input_path):
+def run_a_star(input_path, timetable_specs):
     print("Running a*.")
     result = astar(timetable_specs)
 
@@ -501,6 +491,7 @@ def run_a_star(input_file_name, timetable_specs, input_path):
 
     print("Constrangeri soft:", check_optional_constraints(result, timetable_specs))
     print("Constrangeri hard:", check_mandatory_constraints(result, timetable_specs))
+
 
 if __name__ == "__main__":
 
@@ -515,9 +506,9 @@ if __name__ == "__main__":
     timetable_specs = read_yaml_file(input_name)
 
     if algorithm == "astar":
-        run_a_star(input_name, timetable_specs, input_name)
+        run_a_star(input_name, timetable_specs)
     elif algorithm == "pcsp":
-        run_pcsp(input_name, timetable_specs, input_name)
+        run_pcsp(input_name, timetable_specs)
     else:
         print("Unknown algorithm.")
     
