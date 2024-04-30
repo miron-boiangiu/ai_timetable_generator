@@ -458,7 +458,7 @@ def prepare_output_pcsp(result, timetable_specs):
     return timetable
 
 
-def run_pcsp(input_path, timetable_specs):
+def run_pcsp(input_path, timetable_specs, output_name):
     global best_solution
     global best_cost
     global iterations
@@ -502,8 +502,11 @@ def run_pcsp(input_path, timetable_specs):
     print("Constrangeri soft:", check_optional_constraints(result, timetable_specs))
     print("Constrangeri hard:", check_mandatory_constraints(result, timetable_specs))
 
+    with open(output_name, "w") as f:
+        f.write(pretty_print_timetable(result, input_path))
 
-def run_a_star(input_path, timetable_specs):
+
+def run_a_star(input_path, timetable_specs, output_name):
     print("Running a*.")
     result = astar(timetable_specs)
 
@@ -518,6 +521,9 @@ def run_a_star(input_path, timetable_specs):
     print("Constrangeri soft:", check_optional_constraints(result, timetable_specs))
     print("Constrangeri hard:", check_mandatory_constraints(result, timetable_specs))
 
+    with open(output_name, "w") as f:
+        f.write(pretty_print_timetable(result, input_path))
+
 
 if __name__ == "__main__":
 
@@ -529,12 +535,13 @@ if __name__ == "__main__":
     name = sys.argv[2]
 
     input_name = f'inputs/{name}.yaml'
+    output_name = f'outputs/{name}.txt'
     timetable_specs = read_yaml_file(input_name)
 
     if algorithm == "astar":
-        run_a_star(input_name, timetable_specs)
+        run_a_star(input_name, timetable_specs, output_name)
     elif algorithm == "csp":
-        run_pcsp(input_name, timetable_specs)
+        run_pcsp(input_name, timetable_specs, output_name)
     else:
         print("Unknown algorithm.")
     
