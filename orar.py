@@ -109,7 +109,7 @@ def state_neighbours(state, timetable_specs, subject_order):
 
 
 def h(state, timetable_specs, min_classroom_size):
-    min_classroom_size -= 10
+    min_classroom_size /= 5
     unfinished_subjects = [tup for tup in state[STUDENTS_TO_ASSIGN_PER_SUBJECT].items() if tup[1] > 0]
 
     if len(unfinished_subjects) == 0:
@@ -178,6 +178,7 @@ def generate_subject_order(timetable_specs):
 
 
 def astar(timetable_specs):
+    num_states = 1
 
     min_classroom_size = float('inf')
     for classroom in timetable_specs[SALI]:
@@ -198,12 +199,14 @@ def astar(timetable_specs):
         _, _, node = heappop(frontier)
 
         if all_covered(node, timetable_specs):
+            print ("States generated:", num_states)
             return node
 
         for n in state_neighbours(node, timetable_specs, subject_order):
             state_key = str(n)
 
             if state_key not in discovered:
+                num_states += 1
                 heap_entries_count_priority -= 1
                 heappush(frontier, (g(n) + h(n, timetable_specs, min_classroom_size), heap_entries_count_priority, n) )
                 discovered[state_key] = g(n)
@@ -415,7 +418,12 @@ def compute_hard_constraints(variables, timetable_specs):
     return constraints
 
 
-def compute_soft_constraints(variables, timetable_specs):
+def compute_soft_constraints(variables, timetable_specs):  # I'm atomically close to off-ing myself. Unironically.
+    soft_constraints = []
+
+    
+
+
     return []
 
 
@@ -470,6 +478,8 @@ def run_pcsp(input_path, timetable_specs):
 
     result = best_solution
 
+    print("Number of iterations:", iterations)
+
     if result == None:
         print("No solution found")
         return
@@ -484,6 +494,10 @@ def run_pcsp(input_path, timetable_specs):
 def run_a_star(input_path, timetable_specs):
     print("Running a*.")
     result = astar(timetable_specs)
+
+    if (result == None):
+        print ("No solution found.")
+        return
 
     print(result[WEAK_CONSTRAINTS])
     result = prepare_output(result, timetable_specs)
@@ -507,7 +521,7 @@ if __name__ == "__main__":
 
     if algorithm == "astar":
         run_a_star(input_name, timetable_specs)
-    elif algorithm == "pcsp":
+    elif algorithm == "csp":
         run_pcsp(input_name, timetable_specs)
     else:
         print("Unknown algorithm.")
